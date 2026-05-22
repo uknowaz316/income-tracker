@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>收入记录</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5; min-height: 100vh; padding-bottom: 80px;
+        }
+        .header {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32); color: white;
+            padding: 20px; text-align: center; position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .header h1 { font-size: 24px; margin-bottom: 4px; }
+        .header .sync-status { font-size: 11px; opacity: 0.85; }
+        .month-nav {
+            display: flex; align-items: center; justify-content: center; gap: 16px;
+            padding: 16px; background: white; border-bottom: 1px solid #e0e0e0;
+        }
+        .month-nav button {
+            background: #E8F5E9; border: none; border-radius: 8px;
+            width: 40px; height: 40px; font-size: 18px; color: #4CAF50; cursor: pointer;
+        }
+        .month-nav button:hover { background: #4CAF50; color: white; }
+        .month-nav .current-month { font-size: 18px; font-weight: bold; color: #333; }
+        .stats-card {
+            background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+            border-radius: 16px; padding: 24px; margin: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .stats-card .label { color: #666; font-size: 14px; }
+        .stats-card .total { color: #2E7D32; font-size: 36px; font-weight: bold; margin-top: 8px; }
+        .stats-card .categories { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.1); }
+        .stats-card .categories h3 { font-size: 14px; color: #666; margin-bottom: 12px; }
+        .category-item {
+            display: flex; justify-content: space-between; padding: 8px 12px;
+            background: white; border-radius: 8px; margin-bottom: 8px;
+        }
+        .category-item .name { color: #333; }
+        .category-item .amount { color: #4CAF50; font-weight: bold; }
+        .records-section { padding: 16px; }
+        .records-section h2 { font-size: 16px; color: #666; margin-bottom: 12px; }
+        .record-item {
+            background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .record-item .info { flex: 1; }
+        .record-item .amount { font-size: 20px; font-weight: bold; color: #2E7D32; }
+        .record-item .meta { display: flex; gap: 8px; margin-top: 6px; font-size: 13px; }
+        .record-item .category-tag {
+            background: #E8F5E9; color: #4CAF50; padding: 2px 10px;
+            border-radius: 12px; font-size: 12px;
+        }
+        .record-item .date { color: #999; }
+        .record-item .note { color: #666; margin-top: 6px; font-size: 13px; }
+        .record-item .delete-btn {
+            background: none; border: none; color: #e53935; font-size: 24px;
+            cursor: pointer; padding: 8px; opacity: 0.6;
+        }
+        .record-item .delete-btn:hover { opacity: 1; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        .add-btn {
+            position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px;
+            background: linear-gradient(135deg, #4CAF50, #2E7D32); border: none;
+            border-radius: 28px; color: white; font-size: 28px; cursor: pointer;
+            box-shadow: 0 4px 16px rgba(76,175,80,0.4); z-index: 100;
+        }
+        .add-btn:hover { transform: scale(1.1); }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            justify-content: center; align-items: center; padding: 16px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white; border-radius: 16px; padding: 24px;
+            width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { color: #333; font-size: 20px; }
+        .modal-header .close-btn { background: none; border: none; font-size: 28px; color: #999; cursor: pointer; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; color: #666; font-size: 14px; margin-bottom: 8px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 16px;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #4CAF50; }
+        .form-group input[type="number"] { font-size: 24px; font-weight: bold; color: #2E7D32; }
+        .form-group .hint { font-size: 12px; color: #999; margin-top: 4px; }
+        .save-btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #4CAF50, #2E7D32); border: none;
+            border-radius: 12px; color: white; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        .save-btn:hover { transform: scale(1.02); }
+        .save-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .toolbar {
+            display: flex; gap: 8px; padding: 12px 16px; justify-content: center; flex-wrap: wrap;
+        }
+        .toolbar-btn {
+            padding: 8px 16px; background: white; border: 2px solid #4CAF50;
+            border-radius: 8px; color: #4CAF50; font-size: 13px; cursor: pointer;
+        }
+        .toolbar-btn:hover { background: #4CAF50; color: white; }
+        .toolbar-btn.sync { border-color: #1976D2; color: #1976D2; }
+        .toolbar-btn.sync:hover { background: #1976D2; color: white; }
+        .toast {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; opacity: 0; transition: opacity 0.3s; z-index: 300;
+            max-width: 90vw; text-align: center;
+        }
+        .toast.show { opacity: 1; }
+        .sync-indicator {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px;
+        }
+        .sync-indicator.ok { background: #4CAF50; }
+        .sync-indicator.off { background: #999; }
+        .sync-indicator.err { background: #e53935; }
+        .tab-bar { display: flex; background: white; border-bottom: 2px solid #e0e0e0; }
+        .tab-bar button {
+            flex: 1; padding: 12px; border: none; background: none;
+            font-size: 14px; color: #666; cursor: pointer; border-bottom: 3px solid transparent;
+        }
+        .tab-bar button.active { color: #4CAF50; border-bottom-color: #4CAF50; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        #syncLog {
+            margin-top: 16px; padding: 12px; background: #f5f5f5; border-radius: 8px;
+            font-size: 13px; color: #666; max-height: 200px; overflow-y: auto;
+        }
+        @media (max-width: 480px) {
+            .stats-card .total { font-size: 28px; }
+            .record-item .amount { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 收入记录</h1>
+        <div class="sync-status" id="syncStatus">
+            <span class="sync-indicator off" id="syncDot"></span>
+            <span id="syncText">未连接云同步</span>
+        </div>
+    </div>
+
+    <div class="month-nav">
+        <button onclick="changeMonth(-1)">◀</button>
+        <span class="current-month" id="currentMonth"></span>
+        <button onclick="changeMonth(1)">▶</button>
+    </div>
+
+    <div class="stats-card">
+        <div class="label">本月总收入</div>
+        <div class="total" id="totalIncome">¥ 0.00</div>
+        <div class="categories">
+            <h3>分类汇总</h3>
+            <div id="categorySummary"><div class="empty-state" style="padding:20px">暂无记录</div></div>
+        </div>
+    </div>
+
+    <div class="records-section">
+        <h2>收入明细</h2>
+        <div id="recordsList"><div class="empty-state">点击右下角 ➕ 添加收入</div></div>
+    </div>
+
+    <div class="toolbar">
+        <button class="toolbar-btn" onclick="exportData()">📥 导出</button>
+        <button class="toolbar-btn" onclick="importData()">📤 导入</button>
+        <button class="toolbar-btn" onclick="showAllRecords()">📋 全部</button>
+        <button class="toolbar-btn sync" onclick="openSettingsModal()">☁️ 云同步</button>
+    </div>
+
+    <button class="add-btn" onclick="openAddModal()">➕</button>
+
+    <!-- Add Record Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>添加收入</h2>
+                <button class="close-btn" onclick="closeAddModal()">×</button>
+            </div>
+            <form id="addForm" onsubmit="saveRecord(event)">
+                <div class="form-group">
+                    <label>金额 (¥)</label>
+                    <input type="number" id="amount" step="0.01" min="0" placeholder="输入金额" required>
+                </div>
+                <div class="form-group">
+                    <label>分类</label>
+                    <select id="category">
+                        <option value="工资">工资</option>
+                        <option value="奖金">奖金</option>
+                        <option value="兼职">兼职</option>
+                        <option value="投资">投资</option>
+                        <option value="红包">红包</option>
+                        <option value="退款">退款</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>日期</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div class="form-group">
+                    <label>备注（可选）</label>
+                    <input type="text" id="note" placeholder="例如：某公司工资">
+                </div>
+                <button type="submit" class="save-btn">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings / Sync Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>☁️ 云同步设置</h2>
+                <button class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+            <div class="tab-bar">
+                <button class="active" onclick="switchTab('config',this)">坚果云配置</button>
+                <button onclick="switchTab('help',this)">使用帮助</button>
+            </div>
+            <div class="tab-content active" id="tab-config">
+                <form id="syncForm" onsubmit="saveSyncConfig(event)" style="margin-top:16px">
+                    <div class="form-group">
+                        <label>账号（注册邮箱）</label>
+                        <input type="email" id="syncUser" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>应用密码</label>
+                        <input type="password" id="syncPass" placeholder="坚果云第三方应用密码">
+                        <div class="hint">不是登录密码！坚果云 → 安全选项 → 第三方应用管理 中生成</div>
+                    </div>
+                    <button type="submit" class="save-btn">保存配置</button>
+                </form>
+                <div style="display:flex;gap:12px;margin-top:12px">
+                    <button class="save-btn" style="flex:1;background:#1976D2" onclick="testSync()" id="testBtn">测试连接</button>
+                    <button class="save-btn" style="flex:1;background:#FF9800" onclick="syncToCloud()" id="uploadBtn">⬆️ 上传</button>
+                    <button class="save-btn" style="flex:1;background:#9C27B0" onclick="syncFromCloud()" id="downloadBtn">⬇️ 下载</button>
+                </div>
+                <div id="syncLog" style="display:none"></div>
+            </div>
+            <div class="tab-content" id="tab-help" style="margin-top:16px;font-size:14px;line-height:1.8;color:#555">
+                <p><b>☁️ 坚果云 WebDAV 配置</b></p>
+                <p>1. 注册坚果云：<a href="https://www.jianguoyun.com" target="_blank">jianguoyun.com</a></p>
+                <p>2. 登录 → 右上角头像 → <b>安全选项</b></p>
+                <p>3. <b>第三方应用管理</b> → 添加应用密码</p>
+                <p>4. 填入邮箱 + 应用密码 → 保存</p>
+                <br>
+                <p><b>⬆️ 上传</b>：本地 → 云端（覆盖云端旧数据）</p>
+                <p><b>⬇️ 下载</b>：云端 → 本地（智能合并，不丢数据）</p>
+                <br>
+                <p><b>🔄 多设备流程</b></p>
+                <p>① A设备录入 → 点上传</p>
+                <p>② B设备打开 → 点下载</p>
+                <p>③ B设备新增 → 点上传</p>
+                <p>④ A设备点下载获取最新</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+
+    <script>
+        const STORAGE_KEY = 'income_records';
+        const SYNC_CONFIG_KEY = 'sync_config';
+        const WEBDAV_URL = 'https://dav.jianguoyun.com/dav/';
+        const SYNC_FILE = '/收入记录/income_data.json';
+        let currentYearMonth = getNowYearMonth();
+
+        // ===== Init =====
+        function init() {
+            document.getElementById('date').value = getTodayDate();
+            loadSyncConfig();
+            updateMonthDisplay();
+            refreshData();
+        }
+        function getTodayDate() { return new Date().toISOString().split('T')[0]; }
+        function getNowYearMonth() {
+            const n = new Date();
+            return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+        }
+
+        // ===== Month =====
+        function changeMonth(offset) {
+            const p = currentYearMonth.split('-');
+            let y = parseInt(p[0]), m = parseInt(p[1]) + offset;
+            if (m > 12) { y++; m = 1; } else if (m < 1) { y--; m = 12; }
+            currentYearMonth = `${y}-${String(m).padStart(2,'0')}`;
+            updateMonthDisplay(); refreshData();
+        }
+        function updateMonthDisplay() {
+            document.getElementById('currentMonth').textContent = currentYearMonth + ' 月收入';
+        }
+
+        // ===== Data =====
+        function getAllRecords() {
+            const d = localStorage.getItem(STORAGE_KEY);
+            return d ? JSON.parse(d) : [];
+        }
+        function saveAllRecords(records) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        }
+        function addRecord(record) {
+            const records = getAllRecords();
+            record.id = Date.now(); record.createTime = Date.now();
+            records.push(record); saveAllRecords(records);
+        }
+        function deleteRecord(id) {
+            if (!confirm('确定删除这条记录吗？')) return;
+            saveAllRecords(getAllRecords().filter(r => r.id !== id));
+            refreshData(); showToast('已删除');
+        }
+        function getMonthRecords(ym) { return getAllRecords().filter(r => r.date.startsWith(ym)); }
+        function calculateTotal(records) { return records.reduce((s, r) => s + parseFloat(r.amount), 0); }
+        function calculateCategorySummary(records) {
+            const m = {};
+            records.forEach(r => { m[r.category] = (m[r.category]||0) + parseFloat(r.amount); });
+            return m;
+        }
+
+        // ===== Refresh =====
+        function refreshData() {
+            const records = getMonthRecords(currentYearMonth);
+            const total = calculateTotal(records);
+            const summary = calculateCategorySummary(records);
+            document.getElementById('totalIncome').textContent = `¥ ${total.toFixed(2)}`;
+            const sd = document.getElementById('categorySummary');
+            sd.innerHTML = Object.keys(summary).length
+                ? Object.entries(summary).sort((a,b)=>b[1]-a[1]).map(([c,a]) =>
+                    `<div class="category-item"><span class="name">${c}</span><span class="amount">¥ ${a.toFixed(2)}</span></div>`).join('')
+                : '<div class="empty-state" style="padding:20px">暂无记录</div>';
+            const ld = document.getElementById('recordsList');
+            ld.innerHTML = records.length
+                ? records.sort((a,b)=>b.createTime-a.createTime).map(r => `
+                    <div class="record-item">
+                        <div class="info">
+                            <div class="amount">¥ ${parseFloat(r.amount).toFixed(2)}</div>
+                            <div class="meta"><span class="category-tag">${r.category}</span><span class="date">${r.date}</span></div>
+                            ${r.note ? `<div class="note">${r.note}</div>` : ''}
+                        </div>
+                        <button class="delete-btn" onclick="deleteRecord(${r.id})">🗑</button>
+                    </div>`).join('')
+                : '<div class="empty-state">点击右下角 ➕ 添加收入</div>';
+        }
+        function showAllRecords() {
+            const records = getAllRecords();
+            const total = calculateTotal(records);
+            const summary = calculateCategorySummary(records);
+            document.getElementById('currentMonth').textContent = '全部收入';
+            document.getElementById('totalIncome').textContent = `¥ ${total.toFixed(2)}`;
+            const sd = document.getElementById('categorySummary');
+            sd.innerHTML = Object.keys(summary).length
+                ? Object.entries(summary).sort((a,b)=>b[1]-a[1]).map(([c,a]) =>
+                    `<div class="category-item"><span class="name">${c}</span><span class="amount">¥ ${a.toFixed(2)}</span></div>`).join('')
+                : '<div class="empty-state" style="padding:20px">暂无记录</div>';
+            const ld = document.getElementById('recordsList');
+            ld.innerHTML = records.length
+                ? records.sort((a,b)=>b.createTime-a.createTime).map(r => `
+                    <div class="record-item">
+                        <div class="info">
+                            <div class="amount">¥ ${parseFloat(r.amount).toFixed(2)}</div>
+                            <div class="meta"><span class="category-tag">${r.category}</span><span class="date">${r.date}</span></div>
+                            ${r.note ? `<div class="note">${r.note}</div>` : ''}
+                        </div>
+                        <button class="delete-btn" onclick="deleteRecord(${r.id})">🗑</button>
+                    </div>`).join('')
+                : '<div class="empty-state">暂无记录</div>';
+            showToast('显示全部记录');
+        }
+
+        // ===== Add Modal =====
+        function openAddModal() {
+            document.getElementById('addModal').classList.add('active');
+            document.getElementById('date').value = getTodayDate();
+        }
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+            document.getElementById('addForm').reset();
+        }
+        function saveRecord(event) {
+            event.preventDefault();
+            const amount = document.getElementById('amount').value;
+            if (!amount || parseFloat(amount) <= 0) { showToast('请输入有效金额'); return; }
+            addRecord({ amount: parseFloat(amount), category: document.getElementById('category').value,
+                date: document.getElementById('date').value, note: document.getElementById('note').value.trim() });
+            closeAddModal(); refreshData(); showToast('已保存 ✓');
+        }
+
+        // ===== Settings =====
+        function openSettingsModal() { loadSyncConfigToForm(); document.getElementById('settingsModal').classList.add('active'); }
+        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('active'); }
+        function switchTab(name, btn) {
+            document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+        }
+        function getSyncConfig() {
+            const d = localStorage.getItem(SYNC_CONFIG_KEY);
+            return d ? JSON.parse(d) : { user: '', pass: '' };
+        }
+        function saveSyncConfig(event) {
+            event.preventDefault();
+            const user = document.getElementById('syncUser').value.trim();
+            const pass = document.getElementById('syncPass').value;
+            if (!user || !pass) { showToast('请填写账号和密码'); return; }
+            localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify({ user, pass }));
+            showToast('配置已保存 ✓');
+            updateSyncStatus('off', '已配置，未连接');
+        }
+        function loadSyncConfigToForm() {
+            const c = getSyncConfig();
+            document.getElementById('syncUser').value = c.user;
+            document.getElementById('syncPass').value = c.pass;
+        }
+        function loadSyncConfig() {
+            const c = getSyncConfig();
+            updateSyncStatus('off', c.user ? '已配置，未连接' : '未配置云同步');
+        }
+        function updateSyncStatus(state, text) {
+            document.getElementById('syncDot').className = 'sync-indicator ' + state;
+            document.getElementById('syncText').textContent = text;
+        }
+        function addSyncLog(msg) {
+            const log = document.getElementById('syncLog');
+            log.style.display = 'block';
+            log.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ===== WebDAV via Python proxy =====
+        async function webdavProxy(action, data = {}) {
+            const config = getSyncConfig();
+            if (!config.user || !config.pass) throw new Error('请先配置云同步账号');
+            const resp = await fetch('/api/webdav', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...data, action, user: config.user, pass: config.pass })
+            });
+            const result = await resp.json();
+            if (!result.success) throw new Error(result.error || '操作失败');
+            return result;
+        }
+
+        async function testSync() {
+            const btn = document.getElementById('testBtn');
+            btn.disabled = true; btn.textContent = '测试中...';
+            document.getElementById('syncLog').style.display = 'block';
+            addSyncLog('正在连接坚果云...');
+            try {
+                const r = await webdavProxy('test');
+                addSyncLog('✓ 连接成功！用户: ' + r.user);
+                updateSyncStatus('ok', '已连接: ' + r.user);
+                showToast('连接成功 ✓');
+            } catch(e) {
+                addSyncLog('✗ 连接失败: ' + e.message);
+                updateSyncStatus('err', '连接失败');
+                showToast('连接失败');
+            }
+            btn.disabled = false; btn.textContent = '测试连接';
+        }
+
+        async function syncToCloud() {
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true; btn.textContent = '上传中...';
+            document.getElementById('syncLog').style.display = 'block';
+            addSyncLog('正在上传数据到云端...');
+            try {
+                const records = getAllRecords();
+                addSyncLog(`本地共 ${records.length} 条记录`);
+                const r = await webdavProxy('upload', { records });
+                addSyncLog(`✓ 上传成功！共 ${records.length} 条记录已同步`);
+                updateSyncStatus('ok', '上次上传: ' + new Date().toLocaleTimeString());
+                showToast('上传同步成功 ✓');
+            } catch(e) {
+                addSyncLog('✗ 上传失败: ' + e.message);
+                showToast('上传失败');
+            }
+            btn.disabled = false; btn.textContent = '⬆️ 上传';
+        }
+
+        async function syncFromCloud() {
+            const btn = document.getElementById('downloadBtn');
+            btn.disabled = true; btn.textContent = '下载中...';
+            document.getElementById('syncLog').style.display = 'block';
+            addSyncLog('正在从云端下载数据...');
+            try {
+                const r = await webdavProxy('download');
+                if (!r.records || !r.records.length) {
+                    addSyncLog('云端暂无数据，请先在其他设备上传');
+                    showToast('云端暂无数据');
+                } else {
+                    const local = getAllRecords();
+                    const localIds = new Set(local.map(r => r.id));
+                    const merged = [...local];
+                    let added = 0;
+                    r.records.forEach(rec => { if (!localIds.has(rec.id)) { merged.push(rec); added++; } });
+                    saveAllRecords(merged);
+                    refreshData();
+                    addSyncLog(`✓ 下载成功！云端 ${r.records.length} 条，合并新增 ${added} 条`);
+                    updateSyncStatus('ok', '上次下载: ' + new Date().toLocaleTimeString());
+                    showToast(`下载成功，新增 ${added} 条 ✓`);
+                }
+            } catch(e) {
+                addSyncLog('✗ 下载失败: ' + e.message);
+                showToast('下载失败');
+            }
+            btn.disabled = false; btn.textContent = '⬇️ 下载';
+        }
+
+        // ===== Export / Import =====
+        function exportData() {
+            const records = getAllRecords();
+            if (!records.length) { showToast('没有数据可导出'); return; }
+            const blob = new Blob([JSON.stringify(records, null, 2)], {type:'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `income_backup_${getTodayDate()}.json`;
+            a.click(); URL.revokeObjectURL(a.href);
+            showToast('已导出 ' + records.length + ' 条记录');
+        }
+        function importData() { document.getElementById('importFile').click(); }
+        function handleImport(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!Array.isArray(imported)) { showToast('文件格式错误'); return; }
+                    const existing = getAllRecords();
+                    const ids = new Set(existing.map(r => r.id));
+                    let added = 0;
+                    imported.forEach(r => { if (!ids.has(r.id)) { existing.push(r); added++; } });
+                    saveAllRecords(existing); refreshData();
+                    showToast(`已导入 ${added} 条新记录`);
+                } catch(err) { showToast('导入失败'); }
+            };
+            reader.readAsText(file); event.target.value = '';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+        init();
+    </script>
+</body>
+</html>
